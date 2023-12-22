@@ -27,7 +27,7 @@ INCLUDE	:= include
 LIB		:= lib
 
 ifeq ($(OS),Windows_NT)
-MAIN	:= main.exe
+MAIN	:= BecksBLang.exe
 SOURCEDIRS	:= $(SRC)
 INCLUDEDIRS	:= $(INCLUDE)
 LIBDIRS		:= $(LIB)
@@ -65,8 +65,6 @@ DEPS		:= $(OBJECTS:.o=.d)
 # deleting dependencies appended to the file from 'make depend'
 #
 
-OUTPUTMAIN	:= $(call FIXPATH,$(OUTPUT)/$(MAIN))
-
 all: $(OUTPUT) $(MAIN)
 	@echo Executing 'all' complete!
 
@@ -74,7 +72,7 @@ $(OUTPUT):
 	$(MD) $(OUTPUT)
 
 $(MAIN): $(OBJECTS)
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $(OUTPUTMAIN) $(OBJECTS) $(LFLAGS) $(LIBS)
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $(MAIN) $(OBJECTS) $(LFLAGS) $(LIBS)
 
 # include all .d files
 -include $(DEPS)
@@ -89,11 +87,11 @@ $(MAIN): $(OBJECTS)
 
 .PHONY: clean
 clean:
-	$(RM) $(OUTPUTMAIN)
+	$(RM) $(MAIN)
 	$(RM) $(call FIXPATH,$(OBJECTS))
 	$(RM) $(call FIXPATH,$(DEPS))
 	@echo Cleanup complete!
 
 run: all
-	./$(OUTPUTMAIN)
+	./$(MAIN)
 	@echo Executing 'run: all' complete!
