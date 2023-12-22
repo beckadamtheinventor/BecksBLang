@@ -12,6 +12,7 @@ std::string ERROR_STRINGS[BecksBLang::NUM_ERRORS] = {
     "Out of bounds const data",
     "Stack underflow",
     "Stack overflow",
+    "Stack out of bounds",
     "Invalid opcode",
     "Invalid argument",
     "Invalid string",
@@ -26,9 +27,9 @@ int main(int argc, char **argv) {
         int err;
         if ((err = file.run())) {
             if (err != BecksBLang::DONE) {
-                printf("An error occurred during execution.\n");
+                printf("\nAn error occurred during execution.\n");
                 if (err < BecksBLang::NUM_ERRORS) {
-                    printf("Error %u: %s\n", err, ERROR_STRINGS[err].c_str());
+                    printf("Error %u: %s.\n", err, ERROR_STRINGS[err].c_str());
                 }
             }
         }

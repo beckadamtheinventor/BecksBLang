@@ -28,6 +28,7 @@ namespace BecksBLang {
         OUT_OF_BOUNDS_CONST_DATA,
         STACK_UNDERFLOW,
         STACK_OVERFLOW,
+        STACK_OUT_OF_BOUNDS,
         INVALID_OPCODE,
         INVALID_ARGUMENT,
         INVALID_STRING,
@@ -76,10 +77,11 @@ namespace BecksBLang {
         CALL,
         RETURN,
         JUMP,
+        JREL,
         BZERO,
         BNZERO,
-        BNEG,
         BPOS,
+        BNEG,
     };
     
     // class containing Execution Context such as registers and variables. 4624 bytes each.
@@ -144,9 +146,12 @@ namespace BecksBLang {
         }
 
         // pop uint from the stack.
-        // errors with STACK_UNDERFLOW if sp ends up out of bounds.
+        // errors with STACK_UNDERFLOW if SP ends up out of bounds.
+        // errors with STACK_OUT_OF_BOUNDS if the pop happens with SP >= BP (stack pointer underflows function base)
         uint pop(void) {
-            if (sp >= stack_depth) {
+            if (sp >= bp) {
+
+            } else if (sp >= stack_depth) {
                 err = ERR::STACK_UNDERFLOW;
             } else {
                 return stack[sp++];
@@ -166,7 +171,7 @@ namespace BecksBLang {
         uchar *data = nullptr;
         uchar *cdata = nullptr;
         size_t cdatanumentries = 0;
-        ushort cdataentries[MAX_CONST_DATA_ENTRIES];
+        uint cdataentries[MAX_CONST_DATA_ENTRIES];
         public:
         Bytecode() : Bytecode(nullptr, 0, nullptr, 0) {};
         Bytecode(uchar *data, size_t length, uchar *cdata, size_t clength) {
@@ -174,21 +179,26 @@ namespace BecksBLang {
             this->length = length;
             this->cdata = cdata;
             this->clength = clength;
-            memset(&cdataentries, 0, MAX_CONST_DATA_ENTRIES*sizeof(ushort));
+            ec = ExecutionContext();
+            memset(&cdataentries, 0, MAX_CONST_DATA_ENTRIES*sizeof(uint));
             cdatanumentries = 0;
             if (cdata != nullptr && clength > 0) {
                 size_t p = 0;
                 for (; cdatanumentries < MAX_CONST_DATA_ENTRIES; cdatanumentries++) {
                     ushort l = *(ushort*)(&cdata[p]);
-                    if (l == 0) {
+                    if (l == 0 || p+l+2 == clength) {
                         break;
                     }
-                    if (p+l+2 >= clength) {
+                    if (p+l+2 > clength) {
                         ec.err = ERR::OUT_OF_BOUNDS_CONST_DATA;
                         break;
                     }
-                    cdataentries[cdatanumentries++] = p;
+                    cdataentries[cdatanumentries] = p;
+                    p += l + 2;
                 }
+            }
+            if (this->data == nullptr || this->length == 0 || this->length >= MAX_BYTECODE_LENGTH) {
+                ec.err = INVALID_FILE_DATA;
             }
         }
 
@@ -196,8 +206,8 @@ namespace BecksBLang {
         template<class T>
         T read(uint addr) {
             T val = 0;
-            if (addr + sizeof(T) < std::min(this->length, MAX_BYTECODE_LENGTH)) {
-                addr = *(T*)(&data[addr]);
+            if (addr + sizeof(T) <= std::min(length, MAX_BYTECODE_LENGTH)) {
+                val = *(T*)(&data[addr]);
             } else {
                 ec.err = ERR::OUT_OF_BOUNDS_READ;
             }
@@ -218,30 +228,27 @@ namespace BecksBLang {
         */
 
         // return pointer to data prefixed with length as an unsigned short
-        char *get_data(ushort datano) {
+        uchar *get_data(ushort datano) {
             if (datano < cdatanumentries) {
-                return (char*)&cdata[cdataentries[datano]];
+                return &cdata[cdataentries[datano]];
             } else {
                 ec.err = ERR::OUT_OF_BOUNDS_DATA_INDEX;
             }
             return nullptr;
         }
 
-        // returns true if null terminated string contains only characters 0x20-0x7D
-        bool str_is_valid(char *str) {
-            for (size_t i = 0; str[i]!=0; i++) {
+        // returns true if null terminated string contains only characters 0x20-0x7D, and the length of the string is correct.
+        bool str_is_valid(char *str, size_t len) {
+            size_t i;
+            for (i = 0; str[i]!=0; i++) {
                 if ((unsigned)str[i] < 0x20 || (unsigned)str[i] >= 0x7E) {
                     return false;
                 }
             }
-            return true;
+            return (i+1 == len);
         }
 
         int execute() {
-            if (this->data == nullptr || this->length == 0 || this->length >= MAX_BYTECODE_LENGTH) {
-                return INVALID_FILE_DATA;
-            }
-            ec = ExecutionContext();
             do {
                 char *str = nullptr;
                 float argf = 0;
@@ -259,7 +266,7 @@ namespace BecksBLang {
                         break;
                     case OPC::STORE_VAR:
                         arg = read<ushort>(ec.pc);
-                        ec.pc += 2;
+                        ec.pc += sizeof(ushort);
                         ec.set_var(arg, ec.ans);
                         break;
                     case OPC::LOAD_VAR:
@@ -331,19 +338,15 @@ namespace BecksBLang {
                         ec.ans = (ec.ans == 0 ? 0 : (ec.ans > 0 ? 1 : -1));
                         break;
                     case OPC::ITOF:
-                        arg = read<ushort>(ec.pc);
-                        ec.pc += sizeof(ushort);
-                        ec.set_var(arg, (float)ec.get_var<uint>(arg));
+                        ec.ansf = ec.ans;
                         break;
                     case OPC::FTOI:
-                        arg = read<ushort>(ec.pc);
-                        ec.pc += sizeof(ushort);
-                        ec.set_var(arg, (uint)(int)ec.get_var<float>(arg));
+                        ec.ans = ec.ansf;
                         break;
                     case OPC::ABS:
-                        arg = read<ushort>(ec.pc);
-                        ec.pc += sizeof(ushort);
-                        ec.set_var(arg, ec.get_var<uint>(arg) & (~(1<<31)));
+                        if (ec.ans >> 31) {
+                            ec.ans = -ec.ans;
+                        };
                         break;
                     case OPC::FADD_VAR:
                         arg = read<ushort>(ec.pc);
@@ -401,8 +404,15 @@ namespace BecksBLang {
                         printf("\n");
                         break;
                     case OPC::PRINT_STR:
-                        str = get_data(arg);
-                        if (str_is_valid(str)) {
+                        arg = read<ushort>(ec.pc);
+                        ec.pc += 2;
+                        str = (char*)get_data(arg);
+                        // grab size word
+                        arg = *(ushort*)str;
+                        // bypass size word
+                        str = &str[2];
+                        // validate the string
+                        if (str_is_valid(str, arg)) {
                             printf("%s", str);
                         } else {
                             ec.err = ERR::INVALID_STRING;
@@ -450,6 +460,14 @@ namespace BecksBLang {
                         break;
                     case OPC::JUMP:
                         ec.pc = read<uint>(ec.pc);
+                        // verify jump location is within the program
+                        if (ec.pc >= length) {
+                            ec.err = ERR::BAD_JUMP;
+                        }
+                        break;
+                    case OPC::JREL:
+                        arg = read<ushort>(ec.pc);
+                        ec.pc += 2 + (signed)arg;
                         // verify jump location is within the program
                         if (ec.pc >= length) {
                             ec.err = ERR::BAD_JUMP;
@@ -505,7 +523,7 @@ namespace BecksBLang {
     };
 
     class BytecodeFile {
-        constexpr static const char HEADER[5] = "BBL\x7f";
+        constexpr static const char HEADER[4] = {'B', 'B', 'L', 0x7F};
         const char *path;
         Bytecode data;
         uchar *filedata;
@@ -522,7 +540,7 @@ namespace BecksBLang {
                 fclose(fd);
                 size_t codelen = *(uint*)(&filedata[sizeof(HEADER)]);
                 size_t cdatalen = *(uint*)(&filedata[sizeof(HEADER)+sizeof(uint)]);
-                Bytecode(&filedata[sizeof(uint)*2+sizeof(HEADER)], codelen, &filedata[sizeof(uint)*2+sizeof(HEADER)+codelen], cdatalen);
+                data = Bytecode(&filedata[sizeof(uint)*2+sizeof(HEADER)], codelen, &filedata[sizeof(uint)*2+sizeof(HEADER)+codelen], cdatalen);
             } else {
                 filedata = nullptr;
             }
