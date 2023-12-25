@@ -1,5 +1,7 @@
 
+#include <string>
 #include "BecksBLang.hpp"
+
 std::string ERROR_STRINGS[BecksBLang::NUM_ERRORS] = {
     "",
     "No file data or file not found",

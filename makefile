@@ -65,11 +65,11 @@ DEPS		:= $(OBJECTS:.o=.d)
 # deleting dependencies appended to the file from 'make depend'
 #
 
-all: $(OUTPUT) $(MAIN)
+all: $(MAIN)
 	@echo Executing 'all' complete!
 
-$(OUTPUT):
-	$(MD) $(OUTPUT)
+#$(OUTPUT):
+#	$(MD) $(OUTPUT)
 
 $(MAIN): $(OBJECTS)
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $(MAIN) $(OBJECTS) $(LFLAGS) $(LIBS)

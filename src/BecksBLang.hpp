@@ -2,14 +2,7 @@
 #define __BecksBLang_hpp__
 
 #include <algorithm>
-#include <array>
-#include <cstddef>
-#include <exception>
-#include <fstream>
-#include <istream>
 #include <cstring>
-#include <map>
-#include <string>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
