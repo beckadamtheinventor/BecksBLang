@@ -96,6 +96,34 @@ virtual at 0
     O_BNEG rb 1
 end virtual
 
+    O_EXT_GAMEOBJECT := $80
+
+virtual at 0
+    rb 1
+    O_GO_SELECT_GAMEOBJECT rb 1
+    O_GO_PRINT_GAMEOBJECT rb 1
+    O_GO_GET_ACTIVE rb 1
+    O_GO_SET_ACTIVE rb 1
+    O_GO_GET_TRANSFORM_X rb 1
+    O_GO_GET_TRANSFORM_Y rb 1
+    O_GO_GET_TRANSFORM_Z rb 1
+    O_GO_GET_TRANSFORM_RX rb 1
+    O_GO_GET_TRANSFORM_RY rb 1
+    O_GO_GET_TRANSFORM_RZ rb 1
+    O_GO_GET_TRANSFORM_SX rb 1
+    O_GO_GET_TRANSFORM_SY rb 1
+    O_GO_GET_TRANSFORM_SZ rb 1
+    O_GO_SET_TRANSFORM_X rb 1
+    O_GO_SET_TRANSFORM_Y rb 1
+    O_GO_SET_TRANSFORM_Z rb 1
+    O_GO_SET_TRANSFORM_RX rb 1
+    O_GO_SET_TRANSFORM_RY rb 1
+    O_GO_SET_TRANSFORM_RZ rb 1
+    O_GO_SET_TRANSFORM_SX rb 1
+    O_GO_SET_TRANSFORM_SY rb 1
+    O_GO_SET_TRANSFORM_SZ rb 1
+end virtual
+
 macro nop?
     db O_NOP
 end macro

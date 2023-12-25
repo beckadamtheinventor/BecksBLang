@@ -3,14 +3,17 @@
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
 #include <exception>
 #include <fstream>
 #include <istream>
 #include <cstring>
+#include <map>
 #include <string>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+
 namespace BecksBLang {
     typedef unsigned int uint;
     typedef unsigned short ushort;
@@ -32,9 +35,11 @@ namespace BecksBLang {
         INVALID_OPCODE,
         INVALID_ARGUMENT,
         INVALID_STRING,
+        INVALID_CHAR,
         BAD_RETURN,
         BAD_JUMP,
         EXEC_END_OF_FILE,
+        EXEC_TOO_LONG,
         NUM_ERRORS,
         DONE = -1,
     };
@@ -82,11 +87,76 @@ namespace BecksBLang {
         BNZERO,
         BPOS,
         BNEG,
+        PRINT_CHAR,
+        EXT_GAMEOBJECT = 0x80,
+    };
+
+    enum OPC_GAMEOBJECT {
+        SELECT_GAMEOBJECT = 1,
+        PRINT_GAMEOBJECT,
+        GET_ACTIVE,
+        SET_ACTIVE,
+        GET_TRANSFORM_X,
+        GET_TRANSFORM_Y,
+        GET_TRANSFORM_Z,
+        GET_TRANSFORM_RX,
+        GET_TRANSFORM_RY,
+        GET_TRANSFORM_RZ,
+        GET_TRANSFORM_SX,
+        GET_TRANSFORM_SY,
+        GET_TRANSFORM_SZ,
+        SET_TRANSFORM_X,
+        SET_TRANSFORM_Y,
+        SET_TRANSFORM_Z,
+        SET_TRANSFORM_RX,
+        SET_TRANSFORM_RY,
+        SET_TRANSFORM_RZ,
+        SET_TRANSFORM_SX,
+        SET_TRANSFORM_SY,
+        SET_TRANSFORM_SZ,
+
     };
     
-    // class containing Execution Context such as registers and variables. 4624 bytes each.
+    // class for emulating Unity environment... partially
+    class UnityEnvironment {
+        public:
+        class Transform {
+            public:
+            float x, y, z;
+            float rx, ry, rz;
+            float sx, sy, sz;
+        };
+        class GameObject {
+            public:
+            size_t numchildren;
+            size_t maxchildren;
+            GameObject *children;
+            Transform transform;
+            std::map<std::string, std::string> properties;
+            std::string name;
+            bool active;
+            bool render;
+            GameObject() : GameObject("Anon") {}
+            GameObject(size_t children) : GameObject("Anon", children) {}
+            GameObject(std::string name) : GameObject(name, 2) {}
+            GameObject(std::string name, size_t children) {
+                this->name = name;
+                this->numchildren = 0;
+                this->maxchildren = children;
+                this->children = (GameObject*)malloc(sizeof(GameObject)*children);
+            }
+        };
+
+        UnityEnvironment() {
+            GameObject cube("Cube");
+            GameObject sphere("Sphere");
+        }
+    };
+
+    // class containing Execution Context such as registers and variables. 4628 bytes each.
     class ExecutionContext {
         public:
+        UnityEnvironment::GameObject selectedGameObject;
         static const uint num_vars = 1024;
         static const uint stack_depth = 128;
         int err;
@@ -164,8 +234,10 @@ namespace BecksBLang {
     class Bytecode {
         constexpr static const size_t MAX_BYTECODE_LENGTH = 1 << 24;
         constexpr static const size_t MAX_CONST_DATA_ENTRIES = 1 << 16;
+        constexpr static const size_t MAX_CYCLES_PER_EXEC = 10240;
 
         ExecutionContext ec;
+        UnityEnvironment env;
         size_t length = 0;
         size_t clength = 0;
         uchar *data = nullptr;
@@ -180,6 +252,7 @@ namespace BecksBLang {
             this->cdata = cdata;
             this->clength = clength;
             ec = ExecutionContext();
+            env = UnityEnvironment();
             memset(&cdataentries, 0, MAX_CONST_DATA_ENTRIES*sizeof(uint));
             cdatanumentries = 0;
             if (cdata != nullptr && clength > 0) {
@@ -202,6 +275,23 @@ namespace BecksBLang {
             }
         }
 
+        int execute() {
+            size_t cycle_count = 0;
+            do {
+                if (ec.pc >= length) {
+                    ec.err = ERR::EXEC_END_OF_FILE;
+                    break;
+                }
+                if (cycle_count++ >= MAX_CYCLES_PER_EXEC) {
+                    ec.err = ERR::EXEC_TOO_LONG;
+                    break;
+                }
+                tick();
+            } while (ec.err == 0);
+            return ec.err;
+        }
+
+        private:
         // read data from a given offset of program data.
         template<class T>
         T read(uint addr) {
@@ -237,26 +327,121 @@ namespace BecksBLang {
             return nullptr;
         }
 
+        bool char_is_valid(char c) {
+            return c >= 0x20 && c < 0x7E;
+        }
+
         // returns true if null terminated string contains only characters 0x20-0x7D, and the length of the string is correct.
         bool str_is_valid(char *str, size_t len) {
             size_t i;
             for (i = 0; str[i]!=0; i++) {
-                if ((unsigned)str[i] < 0x20 || (unsigned)str[i] >= 0x7E) {
+                if (!char_is_valid((unsigned)str[i])) {
                     return false;
                 }
             }
             return (i+1 == len);
         }
 
-        int execute() {
-            do {
+        void tick_ext_gameobject() {
+            char *str = nullptr;
+            float argf = 0;
+            uint arg = 0;
+            uchar opcode = read<uchar>(ec.pc++);
+            switch (opcode) {
+                case OPC_GAMEOBJECT::SELECT_GAMEOBJECT:
+                    arg = read<ushort>(ec.pc);
+                    ec.pc += 2;
+                    str = (char*)get_data(arg);
+                    // grab size word
+                    arg = *(ushort*)str;
+                    // bypass size word
+                    str = &str[2];
+                    // validate the string
+                    if (str_is_valid(str, arg)) {
+                        // ec.selectedGameObject = env.scene.at(str);
+                    } else {
+                        ec.selectedGameObject.name = "?";
+                    }
+                    break;
+                case OPC_GAMEOBJECT::PRINT_GAMEOBJECT:
+                    printf("GameObject \"%s\"\n\tTransform:\n\t\tPosition: %f, %f, %f\n\t\tRotation: %f, %f, %f\n\t\tScale: %f, %f, %f\n\tChildren: %llu\n",
+                        ec.selectedGameObject.name.c_str(),
+                        ec.selectedGameObject.transform.x, ec.selectedGameObject.transform.y, ec.selectedGameObject.transform.z,
+                        ec.selectedGameObject.transform.rx, ec.selectedGameObject.transform.ry, ec.selectedGameObject.transform.rz,
+                        ec.selectedGameObject.transform.sx, ec.selectedGameObject.transform.sy, ec.selectedGameObject.transform.sz,
+                        ec.selectedGameObject.numchildren
+                    );
+                    break;
+                case OPC_GAMEOBJECT::GET_ACTIVE:
+                    ec.ans = ec.selectedGameObject.active;
+                    break;
+                case OPC_GAMEOBJECT::SET_ACTIVE:
+                    ec.selectedGameObject.active = ec.ans;
+                    break;
+                case OPC_GAMEOBJECT::GET_TRANSFORM_X:
+                    ec.ansf = ec.selectedGameObject.transform.x;
+                    break;
+                case OPC_GAMEOBJECT::GET_TRANSFORM_Y:
+                    ec.ansf = ec.selectedGameObject.transform.y;
+                    break;
+                case OPC_GAMEOBJECT::GET_TRANSFORM_Z:
+                    ec.ansf = ec.selectedGameObject.transform.z;
+                    break;
+                case OPC_GAMEOBJECT::GET_TRANSFORM_RX:
+                    ec.ansf = ec.selectedGameObject.transform.rx;
+                    break;
+                case OPC_GAMEOBJECT::GET_TRANSFORM_RY:
+                    ec.ansf = ec.selectedGameObject.transform.ry;
+                    break;
+                case OPC_GAMEOBJECT::GET_TRANSFORM_RZ:
+                    ec.ansf = ec.selectedGameObject.transform.rz;
+                    break;
+                case OPC_GAMEOBJECT::GET_TRANSFORM_SX:
+                    ec.ansf = ec.selectedGameObject.transform.sx;
+                    break;
+                case OPC_GAMEOBJECT::GET_TRANSFORM_SY:
+                    ec.ansf = ec.selectedGameObject.transform.sy;
+                    break;
+                case OPC_GAMEOBJECT::GET_TRANSFORM_SZ:
+                    ec.ansf = ec.selectedGameObject.transform.sz;
+                    break;
+                case OPC_GAMEOBJECT::SET_TRANSFORM_X:
+                    ec.selectedGameObject.transform.x = ec.ansf;
+                    break;
+                case OPC_GAMEOBJECT::SET_TRANSFORM_Y:
+                    ec.selectedGameObject.transform.y = ec.ansf;
+                    break;
+                case OPC_GAMEOBJECT::SET_TRANSFORM_Z:
+                    ec.selectedGameObject.transform.z = ec.ansf;
+                    break;
+                case OPC_GAMEOBJECT::SET_TRANSFORM_RX:
+                    ec.selectedGameObject.transform.rx = ec.ansf;
+                    break;
+                case OPC_GAMEOBJECT::SET_TRANSFORM_RY:
+                    ec.selectedGameObject.transform.ry = ec.ansf;
+                    break;
+                case OPC_GAMEOBJECT::SET_TRANSFORM_RZ:
+                    ec.selectedGameObject.transform.rz = ec.ansf;
+                    break;
+                case OPC_GAMEOBJECT::SET_TRANSFORM_SX:
+                    ec.selectedGameObject.transform.sx = ec.ansf;
+                    break;
+                case OPC_GAMEOBJECT::SET_TRANSFORM_SY:
+                    ec.selectedGameObject.transform.sy = ec.ansf;
+                    break;
+                case OPC_GAMEOBJECT::SET_TRANSFORM_SZ:
+                    ec.selectedGameObject.transform.sz = ec.ansf;
+                    break;
+                default:
+                    ec.err = ERR::INVALID_OPCODE;
+                    break;
+            }
+        }
+
+        void tick() {
                 char *str = nullptr;
                 float argf = 0;
                 uint arg = 0;
-                if (ec.pc >= length) {
-                    ec.err = ERR::EXEC_END_OF_FILE;
-                    break;
-                }
                 uchar opcode = read<uchar>(ec.pc++);
                 switch (opcode) {
                     case OPC::NOP:
@@ -513,13 +698,22 @@ namespace BecksBLang {
                             }
                         }
                         break;
+                    case OPC::PRINT_CHAR:
+                        if (char_is_valid(ec.ans)) {
+                            printf("%c", ec.ans);
+                        } else {
+                            ec.err = ERR::INVALID_CHAR;
+                        }
+                        break;
+                    case OPC::EXT_GAMEOBJECT:
+                        tick_ext_gameobject();
+                        break;
                     default:
                         ec.err = ERR::INVALID_OPCODE;
                         break;
                 }
-            } while (ec.err == 0);
-            return ec.err;
-        }
+            }
+
     };
 
     class BytecodeFile {

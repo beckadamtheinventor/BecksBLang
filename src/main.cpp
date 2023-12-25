@@ -16,9 +16,11 @@ std::string ERROR_STRINGS[BecksBLang::NUM_ERRORS] = {
     "Invalid opcode",
     "Invalid argument",
     "Invalid string",
+    "Invalid character",
     "Bad return",
     "Bad jump",
     "Execution reached end of file",
+    "Execution took too long"
 };
 
 int main(int argc, char **argv) {
