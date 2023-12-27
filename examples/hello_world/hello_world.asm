@@ -53,6 +53,34 @@ bblprogram
             print_uint
             print_newline
 
+        ; gameobject test
+            load_imm   100
+            itof
+            store_var  temp1
+            gameobject_select s_Cube
+            load_imm   123
+            itof
+            fdiv_var   temp1
+            gameobject_set_transform_x
+            gameobject_set_transform_ry
+            gameobject_set_transform_sz
+            load_imm   456
+            itof
+            fdiv_var   temp1
+            gameobject_set_transform_y
+            gameobject_set_transform_rz
+            gameobject_set_transform_sx
+            load_imm   789
+            itof
+            fdiv_var   temp1
+            gameobject_set_transform_z
+            gameobject_set_transform_rx
+            gameobject_set_transform_sy
+            gameobject_print
+
+            gameobject_select s_Sphere
+            gameobject_print
+
             done
 
     end code
@@ -65,5 +93,7 @@ bblprogram
         str s_Formula3, "8*5="
         str s_Formula4, "1/20="
         str s_Formula5, "53%5="
+        str s_Cube, "Cube"
+        str s_Sphere, "Sphere"
     end data
 end bblprogram

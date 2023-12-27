@@ -3,9 +3,11 @@
 
 #include <algorithm>
 #include <cstring>
+#include <string>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include "../include/HashedSymList.hpp"
 
 namespace BecksBLang {
     typedef unsigned int uint;
@@ -110,7 +112,7 @@ namespace BecksBLang {
 
     };
     
-    // class for emulating Unity environment... partially
+    // class for emulating Unity environment... kinda
     class UnityEnvironment {
         public:
         class Transform {
@@ -118,35 +120,32 @@ namespace BecksBLang {
             float x, y, z;
             float rx, ry, rz;
             float sx, sy, sz;
+            Transform() {
+                x = y = z = rx = ry = rz = 0;
+                sx = sy = sz = 1;
+            }
         };
         class GameObject {
             public:
-            size_t numchildren;
-            size_t maxchildren;
-            GameObject *children;
             Transform transform;
-            std::map<std::string, std::string> properties;
+            HashedSymList::HashedSymList<std::string> properties;
             std::string name;
-            bool active;
-            bool render;
             GameObject() : GameObject("Anon") {}
-            GameObject(size_t children) : GameObject("Anon", children) {}
-            GameObject(std::string name) : GameObject(name, 2) {}
-            GameObject(std::string name, size_t children) {
+            GameObject(std::string name) {
                 this->name = name;
-                this->numchildren = 0;
-                this->maxchildren = children;
-                this->children = (GameObject*)malloc(sizeof(GameObject)*children);
+                properties["active"] = std::string("true");
+                properties["render"] = std::string("true");
             }
         };
+        HashedSymList::HashedSymList<GameObject> scene;
 
         UnityEnvironment() {
-            GameObject cube("Cube");
-            GameObject sphere("Sphere");
+            scene["Cube"] = GameObject("Cube");
+            scene["Sphere"] = GameObject("Sphere");
         }
     };
 
-    // class containing Execution Context such as registers and variables. 4628 bytes each.
+    // class containing Execution Context such as registers and variables. ~4712 bytes each.
     class ExecutionContext {
         public:
         UnityEnvironment::GameObject selectedGameObject;
@@ -227,7 +226,7 @@ namespace BecksBLang {
     class Bytecode {
         constexpr static const size_t MAX_BYTECODE_LENGTH = 1 << 24;
         constexpr static const size_t MAX_CONST_DATA_ENTRIES = 1 << 16;
-        constexpr static const size_t MAX_CYCLES_PER_EXEC = 10240;
+        constexpr static const size_t MAX_CYCLES_PER_EXEC = 1024;
 
         ExecutionContext ec;
         UnityEnvironment env;
@@ -351,25 +350,30 @@ namespace BecksBLang {
                     str = &str[2];
                     // validate the string
                     if (str_is_valid(str, arg)) {
-                        // ec.selectedGameObject = env.scene.at(str);
+                        ec.selectedGameObject = env.scene[str];
                     } else {
                         ec.selectedGameObject.name = "?";
                     }
                     break;
                 case OPC_GAMEOBJECT::PRINT_GAMEOBJECT:
-                    printf("GameObject \"%s\"\n\tTransform:\n\t\tPosition: %f, %f, %f\n\t\tRotation: %f, %f, %f\n\t\tScale: %f, %f, %f\n\tChildren: %llu\n",
+                    printf("GameObject \"%s\"\n\tTransform:\n\t\tPosition: %f, %f, %f\n\t\tRotation: %f, %f, %f\n\t\tScale: %f, %f, %f\n\tNum Properties: %llu\n",
                         ec.selectedGameObject.name.c_str(),
                         ec.selectedGameObject.transform.x, ec.selectedGameObject.transform.y, ec.selectedGameObject.transform.z,
                         ec.selectedGameObject.transform.rx, ec.selectedGameObject.transform.ry, ec.selectedGameObject.transform.rz,
                         ec.selectedGameObject.transform.sx, ec.selectedGameObject.transform.sy, ec.selectedGameObject.transform.sz,
-                        ec.selectedGameObject.numchildren
+                        ec.selectedGameObject.properties.Length()
                     );
+                    for (size_t i = 0; i < ec.selectedGameObject.properties.Length(); i++) {
+                        auto sym = ec.selectedGameObject.properties.Get(i);
+                        printf("\t%s: %s\n", sym.key, sym.value.c_str());
+                    }
+                    printf("\n");
                     break;
                 case OPC_GAMEOBJECT::GET_ACTIVE:
-                    ec.ans = ec.selectedGameObject.active;
+                    ec.ans = !strcmp("true", ec.selectedGameObject.properties["active"].value.c_str());
                     break;
                 case OPC_GAMEOBJECT::SET_ACTIVE:
-                    ec.selectedGameObject.active = ec.ans;
+                    ec.selectedGameObject.properties["active"] = ec.ans>0 ? "true" : "false";
                     break;
                 case OPC_GAMEOBJECT::GET_TRANSFORM_X:
                     ec.ansf = ec.selectedGameObject.transform.x;

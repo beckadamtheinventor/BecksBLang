@@ -320,3 +320,95 @@ macro bpos? addr
     db O_BPOS
     dw addr - $ + 2
 end macro
+
+macro gameobject_select? sno
+    db O_EXT_GAMEOBJECT, O_GO_SELECT_GAMEOBJECT
+    dw sno
+end macro
+
+macro gameobject_print?
+    db O_EXT_GAMEOBJECT, O_GO_PRINT_GAMEOBJECT
+end macro
+
+macro gameobject_getactive?
+    db O_EXT_GAMEOBJECT, O_GO_GET_ACTIVE
+end macro
+
+macro gameobject_setactive?
+    db O_EXT_GAMEOBJECT, O_GO_SET_ACTIVE
+end macro
+
+macro gameobject_get_transform_x?
+    db O_EXT_GAMEOBJECT, O_GO_GET_TRANSFORM_X
+end macro
+
+macro gameobject_get_transform_y?
+    db O_EXT_GAMEOBJECT, O_GO_GET_TRANSFORM_Y
+end macro
+
+macro gameobject_get_transform_z?
+    db O_EXT_GAMEOBJECT, O_GO_GET_TRANSFORM_Z
+end macro
+
+macro gameobject_get_transform_rx?
+    db O_EXT_GAMEOBJECT, O_GO_GET_TRANSFORM_RX
+end macro
+
+macro gameobject_get_transform_ry?
+    db O_EXT_GAMEOBJECT, O_GO_GET_TRANSFORM_RY
+end macro
+
+macro gameobject_get_transform_rz?
+    db O_EXT_GAMEOBJECT, O_GO_GET_TRANSFORM_RZ
+end macro
+
+macro gameobject_get_transform_sx?
+    db O_EXT_GAMEOBJECT, O_GO_GET_TRANSFORM_SX
+end macro
+
+macro gameobject_get_transform_sy?
+    db O_EXT_GAMEOBJECT, O_GO_GET_TRANSFORM_SY
+end macro
+
+macro gameobject_get_transform_sz?
+    db O_EXT_GAMEOBJECT, O_GO_GET_TRANSFORM_SZ
+end macro
+
+macro gameobject_set_transform_x?
+    db O_EXT_GAMEOBJECT, O_GO_SET_TRANSFORM_X
+end macro
+
+macro gameobject_set_transform_y?
+    db O_EXT_GAMEOBJECT, O_GO_SET_TRANSFORM_Y
+end macro
+
+macro gameobject_set_transform_z?
+    db O_EXT_GAMEOBJECT, O_GO_SET_TRANSFORM_Z
+end macro
+
+macro gameobject_set_transform_rx?
+    db O_EXT_GAMEOBJECT, O_GO_SET_TRANSFORM_RX
+end macro
+
+macro gameobject_set_transform_ry?
+    db O_EXT_GAMEOBJECT, O_GO_SET_TRANSFORM_RY
+end macro
+
+macro gameobject_set_transform_rz?
+    db O_EXT_GAMEOBJECT, O_GO_SET_TRANSFORM_RZ
+end macro
+
+macro gameobject_set_transform_sx?
+    db O_EXT_GAMEOBJECT, O_GO_SET_TRANSFORM_SX
+end macro
+
+macro gameobject_set_transform_sy?
+    db O_EXT_GAMEOBJECT, O_GO_SET_TRANSFORM_SY
+end macro
+
+macro gameobject_set_transform_sz?
+    db O_EXT_GAMEOBJECT, O_GO_SET_TRANSFORM_SZ
+end macro
+
+
+
